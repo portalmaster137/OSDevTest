@@ -17,7 +17,9 @@ kernel.bin: boot.o kernel.o | $(BUILD_DIR)
 
 kernel.iso: kernel.bin grub.cfg | $(BUILD_DIR)
 	mkdir -p $(BUILD_DIR)/iso/boot
+	mkdir -p $(BUILD_DIR)/iso/boot/grub
 	cp $(BUILD_DIR)/kernel.bin $(BUILD_DIR)/iso/boot/kernel.bin
+	cp grub.cfg $(BUILD_DIR)/iso/boot/grub/grub.cfg
 	grub-mkrescue -o $(BUILD_DIR)/kernel.iso $(BUILD_DIR)/iso
 
 
