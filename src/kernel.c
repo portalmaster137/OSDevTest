@@ -2,14 +2,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#if defined(__linux__)
-#error "No cross compiler, DONT DO THIS SHIT ON LINUX"
-#endif
-
-#if !defined(__i386__)
-#error "Use a I386 Compiler."
-#endif
-
 enum vga_color {
 	VGA_COLOR_BLACK = 0,
 	VGA_COLOR_BLUE = 1,
