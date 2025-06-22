@@ -7,19 +7,15 @@ ENV PREFIX=/usr/local
 ENV TARGET=i686-elf
 ENV PATH=$PREFIX/bin:$PATH
 
+ARG gcc_langs="c,c++"
+
 RUN mkdir /root/src
 WORKDIR /root/src
 
 # Download sources.
 FROM base AS sources
 
-RUN wget https://ftp.gnu.org/gnu/binutils/binutils-2.44.tar.xz
-RUN wget https://ftp.gnu.org/gnu/binutils/binutils-2.44.tar.xz.sig
-RUN wget https://ftp.gnu.org/gnu/gcc/gcc-15.1.0/gcc-15.1.0.tar.xz
-RUN wget https://ftp.gnu.org/gnu/gcc/gcc-15.1.0/gcc-15.1.0.tar.xz.sig
-RUN wget https://ftp.gnu.org/gnu/gdb/gdb-16.3.tar.xz
-RUN wget https://ftp.gnu.org/gnu/gdb/gdb-16.3.tar.xz.sig
-
+COPY ./sources/* /root/src/
 # Verify signatures, getting required keys.
 
 FROM sources AS verify
@@ -36,12 +32,14 @@ RUN gpg --verify binutils-2.44.tar.xz.sig
 RUN gpg --verify gcc-15.1.0.tar.xz.sig
 RUN gpg --verify gdb-16.3.tar.xz.sig
 
+FROM verify AS extract
+
 # Extract sources.
 RUN tar -xpvf binutils-2.44.tar.xz
 RUN tar -xpvf gcc-15.1.0.tar.xz
 RUN tar -xpvf gdb-16.3.tar.xz
 
-FROM verify AS build
+FROM extract AS build-binutils
 
 # Build and install binutils.
 WORKDIR /root/src/
@@ -51,6 +49,8 @@ RUN ../binutils-2.44/configure --target=$TARGET --prefix=$PREFIX --disable-nls -
 RUN make -j$(nproc)
 RUN make install
 
+FROM build-binutils AS build-gdb
+
 # Build and install GDB
 WORKDIR /root/src/
 RUN mkdir build-gdb
@@ -59,11 +59,13 @@ RUN ../gdb-16.3/configure --target=$TARGET --prefix=$PREFIX --disable-werror
 RUN make -j$(nproc) all-gdb
 RUN make install-gdb
 
+FROM build-gdb AS build-gcc
+
 # Build and install GCC
 WORKDIR /root/src/
 RUN mkdir build-gcc
 WORKDIR /root/src/build-gcc
-RUN ../gcc-15.1.0/configure --target=$TARGET --prefix=$PREFIX --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=c,c++ --without-headers --disable-hosted-libstdcxx
+RUN ../gcc-15.1.0/configure --target=$TARGET --prefix=$PREFIX --target=$TARGET --prefix="$PREFIX" --disable-nls --enable-languages=${gcc_langs} --without-headers --disable-hosted-libstdcxx
 RUN make -j$(nproc) all-gcc
 RUN make -j$(nproc) all-target-libgcc
 RUN make -j$(nproc) all-target-libstdc++-v3
@@ -71,13 +73,15 @@ RUN make install-gcc
 RUN make install-target-libgcc
 RUN make install-target-libstdc++-v3
 
-FROM build AS final
+FROM build-gcc AS final
 
 # Cleanup
 WORKDIR /root/src/
 RUN rm -rf binutils-2.44 gcc-15.1.0 gdb
 RUN rm -rf build-binutils build-gcc build-gdb
 RUN rm -rf *.tar.xz *.sig
+
+FROM final AS runtime
 
 RUN pacman -S --noconfirm bash coreutils findutils which grub mtools xorriso dosfstools
 
